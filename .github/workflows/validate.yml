@@ -1,0 +1,61 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python:
+    name: ruff + bandit (Python)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('**/*.py') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff bandit
+      - run: ruff check .
+      - run: bandit -r . -ll --exclude ./.git
+
+  bash:
+    name: shellcheck (Bash)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('**/*.sh') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck on every .sh file
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          find . -name "*.sh" -not -path "./.git/*" -print0 | xargs -0 -r shellcheck
+
+  powershell:
+    name: PSScriptAnalyzer (PowerShell)
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('**/*.ps1') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run PSScriptAnalyzer on every .ps1 file
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
+          $files = Get-ChildItem -Path . -Filter *.ps1 -Recurse -Exclude .git
+          $results = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Severity Warning,Error }
+          if ($results) {
+            $results | Format-Table -AutoSize
+            throw "PSScriptAnalyzer found $($results.Count) issue(s)"
+          }
+
+  iac-sast:
+    name: checkov (CFN + Terraform, if present)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: cloudformation,terraform
+          quiet: true
+          soft_fail: false
