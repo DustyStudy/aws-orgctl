@@ -1,0 +1,37 @@
+# ~/.orgctl/orgs.yaml — your personal AWS account registry.
+# No secrets live here — just aliases, account IDs, and role names.
+
+name: my-org                                  # any label you want
+sso_start_url: https://my-sso-portal.awsapps.com/start
+sso_region: us-east-1                         # region your Identity Center instance lives in
+default_region: us-east-1                     # default region for `exec`/`shell` unless overridden
+
+# Local policy: force a fresh browser login after this many hours, even if
+# the SSO token AWS issued is still technically valid server-side. Optional,
+# defaults to 8.
+max_session_hours: 8
+
+# Optional: push audit-log entries to this CloudWatch Logs log group when you
+# run `orgctl audit-log --push-cloudwatch`. Requires logs:PutLogEvents on
+# whatever role you're using to push (usually a separate low-privilege one,
+# not the account roles below). Leave unset to keep the audit log local-only.
+# cloudwatch_log_group: /orgctl/audit
+
+accounts:
+  management:
+    account_id: "111111111111"
+    roles: [AdministratorAccess]
+    default_role: AdministratorAccess
+    tags: [org-root]
+
+  security:
+    account_id: "222222222222"
+    roles: [SecurityAudit, read-only]
+    default_role: read-only
+    tags: [security]
+
+  sandbox:
+    account_id: "333333333333"
+    roles: [PowerUserAccess]
+    default_role: PowerUserAccess
+    tags: [dev]

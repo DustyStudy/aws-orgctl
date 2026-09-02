@@ -1,0 +1,23 @@
+# ~/.orgctl/guardrails.yaml — optional local speed bumps.
+# This is NOT a security boundary (IAM permission boundaries / SCPs are).
+# It's a client-side check to catch fat-fingered commands before they
+# reach AWS, and to force a confirmation prompt on risky-but-legitimate ones.
+
+# Account IDs where ANY command via `orgctl exec`/`shell` is blocked outright.
+# Useful for a management/root account you never want ad-hoc commands against.
+protected_account_ids:
+  - "111111111111"
+
+# Glob patterns (fnmatch-style) matched against the full joined command string.
+# Anything matching here is blocked, in addition to the tool's built-in defaults
+# (delete-account-alias, leave-organization, close-account, recursive S3 rm, etc).
+deny_patterns:
+  - "aws iam delete-role*"
+  - "aws ec2 terminate-instances*"
+
+# Patterns that are allowed but require an interactive y/N confirmation
+# (skip with `--yes` for scripted/CI use where you trust the caller).
+require_confirmation_patterns:
+  - "aws s3 rm*"
+  - "aws rds delete-db-instance*"
+  - "aws cloudformation delete-stack*"
