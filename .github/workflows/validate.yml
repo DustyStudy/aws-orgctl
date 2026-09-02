@@ -10,23 +10,26 @@ jobs:
   python:
     name: ruff + bandit (Python)
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('**/*.py') != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        if: ${{ hashFiles('**/*.py') != '' }}
         with:
           python-version: "3.12"
-      - run: pip install ruff bandit
-      - run: ruff check .
-      - run: bandit -r . -ll --exclude ./.git
+      - name: Install and run ruff + bandit
+        if: ${{ hashFiles('**/*.py') != '' }}
+        run: |
+          pip install ruff bandit
+          ruff check .
+          bandit -r . -ll --exclude ./.git
 
   bash:
     name: shellcheck (Bash)
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('**/*.sh') != '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Run shellcheck on every .sh file
+        if: ${{ hashFiles('**/*.sh') != '' }}
         run: |
           sudo apt-get update -qq && sudo apt-get install -y shellcheck
           find . -name "*.sh" -not -path "./.git/*" -print0 | xargs -0 -r shellcheck
@@ -34,10 +37,10 @@ jobs:
   powershell:
     name: PSScriptAnalyzer (PowerShell)
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('**/*.ps1') != '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Run PSScriptAnalyzer on every .ps1 file
+        if: ${{ hashFiles('**/*.ps1') != '' }}
         shell: pwsh
         run: |
           Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser
