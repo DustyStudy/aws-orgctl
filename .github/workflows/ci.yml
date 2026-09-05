@@ -6,19 +6,43 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel superseded runs on the same branch/PR instead of letting them pile up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege by default: this workflow only ever reads the repo and
+# talks to PyPI's package index (via pip) — it never needs to write
+# anything back to GitHub. Nothing below grants more than this.
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v7
+      # Restricts what this job's runner can reach on the network and flags
+      # anything unexpected (e.g. a compromised dependency trying to phone
+      # home or exfiltrate secrets). audit mode logs without blocking, to
+      # start; see SECURITY.md for the plan to move this to block mode
+      # once the egress allowlist below is confirmed complete.
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip

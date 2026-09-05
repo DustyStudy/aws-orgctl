@@ -1,9 +1,16 @@
 # orgctl
 
 [![CI](https://github.com/DustyStudy/aws-orgctl/actions/workflows/ci.yml/badge.svg)](https://github.com/DustyStudy/aws-orgctl/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/DustyStudy/aws-orgctl/blob/main/LICENSE)
+[![CodeQL](https://github.com/DustyStudy/aws-orgctl/actions/workflows/codeql.yml/badge.svg)](https://github.com/DustyStudy/aws-orgctl/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/DustyStudy/aws-orgctl/badge)](https://securityscorecards.dev/viewer/?uri=github.com/DustyStudy/aws-orgctl)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-> No coverage badge yet — wiring one up needs a Codecov (or similar) account and token, tracked as a follow-up.
+> Badges only render publicly once this repo is public (or you're viewing
+> it while logged into GitHub) — private-repo badges need auth to display
+> for outside visitors. The Scorecard badge specifically only populates
+> after `scorecard.yml` has run at least once against the public repo. No
+> coverage badge yet; wiring one up needs a Codecov (or similar) account
+> and token, tracked as a follow-up.
 
 **Ephemeral AWS multi-account credential manager, built on IAM Identity Center (SSO).**
 
@@ -49,8 +56,8 @@ CLI (`exec`, `shell`) for using them.
   `--profile`, no wrapper needed.
 - **Configurable session cap** (`max_session_hours`) — force re-auth sooner
   than the SSO token's own expiry, independent of what your org issues.
-- **Advisory IAM policy pre-check** (`orgctl check-policy`, `--check-action` on
-  `exec`) — ask the IAM policy simulator whether a role's identity-based
+- **Advisory IAM policy pre-check** (`orgctl check-policy`, `--check-action`
+  on `exec`) — ask the IAM policy simulator whether a role's identity-based
   policies allow an action before you rely on it. Does not evaluate SCPs or
   resource policies (AWS exposes no simulator API for those).
 - **Shell completion** — `orgctl completion bash|zsh|fish`.
@@ -78,7 +85,7 @@ CLI (`exec`, `shell`) for using them.
 
 ## Install
 
-```
+```bash
 git clone https://github.com/DustyStudy/aws-orgctl.git
 cd aws-orgctl
 python3 -m pip install -e .
@@ -89,7 +96,7 @@ python3 -m pip install -e .
 If you just want the `orgctl` command available globally without managing a
 virtualenv yourself:
 
-```
+```bash
 pipx install git+https://github.com/DustyStudy/aws-orgctl.git
 ```
 
@@ -97,12 +104,12 @@ pipx install git+https://github.com/DustyStudy/aws-orgctl.git
 
 A formula isn't published yet — once there's a tagged release, a
 `Formula/orgctl.rb` pulling from the release tarball can be added to a
-personal tap (`brew tap DustyStudy/orgctl && brew install orgctl`). Tracked as
-a follow-up; pipx is the easiest path in the meantime.
+personal tap (`brew tap DustyStudy/aws-orgctl && brew install orgctl`). Tracked as a
+follow-up; pipx is the easiest path in the meantime.
 
 ### OS keychain for SSO tokens (optional)
 
-```
+```bash
 python3 -m pip install -e ".[keyring]"
 ```
 
@@ -114,7 +121,7 @@ to the existing file-based cache — nothing else changes.
 
 ### Shell completion
 
-```
+```bash
 orgctl completion bash   # or zsh / fish
 ```
 
@@ -123,7 +130,7 @@ completion support — no extra dependency).
 
 ## Quick start
 
-```
+```bash
 # 1. Create your local account registry from the example
 orgctl init
 $EDITOR ~/.orgctl/orgs.yaml   # add your SSO start URL + account IDs/roles
@@ -149,7 +156,7 @@ orgctl shell -a prod -r read-only
 
 ## More commands
 
-```
+```bash
 # Use as a native AWS credential provider — no `orgctl exec` wrapper needed.
 # Add to ~/.aws/config:
 #   [profile prod]
@@ -215,9 +222,9 @@ made before the first write. Re-run it any time your `orgs.yaml` changes.
 
 ### `~/.orgctl/orgs.yaml`
 
-See [`config/orgs.example.yaml`](https://github.com/DustyStudy/aws-orgctl/blob/main/config/orgs.example.yaml).
-No secrets live here — just your Identity Center start URL/region and a map
-of aliases to account IDs and role names. Two optional top-level fields:
+See [`config/orgs.example.yaml`](config/orgs.example.yaml). No secrets live
+here — just your Identity Center start URL/region and a map of aliases to
+account IDs and role names. Two optional top-level fields:
 
 - `max_session_hours` (default 8) — force a fresh browser login after this
   many hours, independent of the SSO token's own server-side expiry.
@@ -225,8 +232,8 @@ of aliases to account IDs and role names. Two optional top-level fields:
 
 ### `~/.orgctl/guardrails.yaml` (optional)
 
-See [`config/guardrails.example.yaml`](https://github.com/DustyStudy/aws-orgctl/blob/main/config/guardrails.example.yaml).
-Lets you mark accounts as protected (block all ad-hoc commands) and add
+See [`config/guardrails.example.yaml`](config/guardrails.example.yaml). Lets
+you mark accounts as protected (block all ad-hoc commands) and add
 deny/require-confirmation glob patterns on top of the built-in defaults
 (blocks things like `organizations leave-organization`, `close-account`,
 recursive `s3 rm`, etc.).
@@ -244,7 +251,7 @@ recursive `s3 rm`, etc.).
 
 ## Development
 
-```
+```bash
 python3 -m pip install -e ".[dev]"
 ruff check src tests
 ruff format src tests
@@ -252,11 +259,10 @@ mypy src
 pytest -v --cov=orgctl --cov-report=term-missing
 ```
 
-See [CONTRIBUTING.md](https://github.com/DustyStudy/aws-orgctl/blob/main/CONTRIBUTING.md)
-for the full workflow (including optional `pre-commit` hooks) and
-[SECURITY.md](https://github.com/DustyStudy/aws-orgctl/blob/main/.github/SECURITY.md)
-for the vulnerability-reporting process and which areas get the most scrutiny.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow (including
+optional `pre-commit` hooks) and [SECURITY.md](.github/SECURITY.md) for
+the vulnerability-reporting process and which areas get the most scrutiny.
 
 ## License
 
-MIT — see [LICENSE](https://github.com/DustyStudy/aws-orgctl/blob/main/LICENSE).
+MIT — see [LICENSE](LICENSE).

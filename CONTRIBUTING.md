@@ -6,8 +6,8 @@ the process is intentionally lightweight.
 ## Setup
 
 ```bash
-git clone https://github.com/DustyStudy/orgctl.git
-cd orgctl
+git clone https://github.com/DustyStudy/aws-orgctl.git
+cd aws-orgctl
 python3 -m pip install -e ".[dev]"
 pre-commit install   # optional but recommended — see below
 ```

@@ -37,6 +37,47 @@ scrutiny for security review:
   never transmitted anywhere by this tool except when you explicitly run
   `orgctl audit-log --push-cloudwatch`.
 
+## CI/CD supply-chain hardening
+
+Every workflow under `.github/workflows/` follows the same baseline:
+
+- **Least-privilege `permissions`** declared at the workflow level
+  (`contents: read` by default), with any broader permission (e.g.
+  `security-events: write` for SARIF uploads, `id-token: write` for
+  Scorecard's Sigstore signing) scoped to only the specific job that needs
+  it — never at the workflow level.
+- **`step-security/harden-runner`** as the first step of every job. It
+  monitors and can restrict network egress and file/process activity on
+  the runner, which is how real incidents like the `tj-actions/changed-files`
+  supply-chain compromise (CVE-2025-30066) get caught in practice. Currently
+  running in `audit` (log-only) mode while the egress allowlist is
+  characterized; the plan is to move to `block` mode with an explicit
+  allowlist once a few weeks of audit logs confirm nothing legitimate gets
+  blocked.
+- **`persist-credentials: false`** on every `actions/checkout` step, so the
+  ephemeral `GITHUB_TOKEN` isn't left sitting in the local git config for
+  the rest of the job.
+- **Explicit `timeout-minutes`** on every job, so a hung or runaway step
+  can't tie up compute (or a compromised dependency) indefinitely.
+- **`concurrency` groups**, so superseded runs on the same ref get
+  cancelled instead of piling up.
+
+**Action pinning policy:** actions are pinned to a full commit SHA by
+default (immutable — a tag like `@v4` can be moved by the maintainer, or by
+an attacker who compromises the maintainer's account, without any signal to
+consumers). The exceptions are first-party GitHub actions
+(`actions/dependency-review-action`, `github/codeql-action`) and
+foundation/major-vendor actions with a strong release cadence and security
+track record (`googleapis/release-please-action`, `ossf/scorecard-action`),
+pinned to major-version tags instead — `github/codeql-action`'s own README
+explicitly recommends *against* SHA-pinning it, since some of its features
+are gated by server-side flags tied to the version tag rather than the
+code itself. Each such exception is called out with a comment in the
+workflow file where it's used.
+
+Dependabot (`.github/dependabot.yml`) keeps both the SHA-pinned and
+tag-pinned actions current automatically.
+
 ## Supported versions
 
 Pre-1.0 — only the latest `main` is supported. Once there's a first
