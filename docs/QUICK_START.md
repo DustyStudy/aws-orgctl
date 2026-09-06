@@ -3,8 +3,8 @@
 ## 1. Install
 
 ```bash
-git clone https://github.com/<you>/orgctl.git
-cd orgctl
+git clone https://github.com/DustyStudy/aws-orgctl.git
+cd aws-orgctl
 python3 -m pip install -e .
 ```
 
@@ -14,7 +14,9 @@ python3 -m pip install -e .
 orgctl init
 ```
 
-This copies `config/orgs.example.yaml` to `~/.orgctl/orgs.yaml`. Open it and fill in:
+This copies the bundled `orgs.example.yaml` (kept in sync with
+[`config/orgs.example.yaml`](../config/orgs.example.yaml) in this repo) to
+`~/.orgctl/orgs.yaml`. Open it and fill in:
 
 - `sso_start_url` — your IAM Identity Center portal URL (looks like
   `https://<your-subdomain>.awsapps.com/start`)

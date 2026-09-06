@@ -213,10 +213,13 @@ simulates Service Control Policies or resource-based policies, so a passing
 result here is necessary but not sufficient — a real SCP can still deny the
 call. Treat it as a fast local sanity check, not a guarantee.
 
-**On `sync-aws-config`:** only ever writes/updates profiles it created
-itself — any profile you already have (from `aws configure`, hand-editing,
-etc.) is left completely alone, and a `.bak` copy of `~/.aws/config` is
-made before the first write. Re-run it any time your `orgs.yaml` changes.
+**On `sync-aws-config`:** each section it writes is tagged internally so a
+later run can tell "orgctl created this" apart from "this profile name
+already existed." If a profile name from your registry collides with a
+section you already had (from `aws configure`, hand-editing, etc.), that
+section is left completely alone and reported back as a conflict — nothing
+about it is overwritten. A `.bak` copy of `~/.aws/config` is made before
+any real write. Re-run it any time your `orgs.yaml` changes.
 
 ## Configuration
 

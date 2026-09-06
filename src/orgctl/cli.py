@@ -81,7 +81,7 @@ def sync_aws_config(prefix: str, all_roles: bool, dry_run: bool):
     A .bak backup of ~/.aws/config is made before any real write.
     """
     cfg = _load_config_or_exit()
-    written, skipped, path = aws_config_sync.sync(
+    written, skipped, conflicts, path = aws_config_sync.sync(
         cfg, prefix=prefix, all_roles=all_roles, dry_run=dry_run
     )
     verb = "Would write" if dry_run else "Wrote"
@@ -94,7 +94,14 @@ def sync_aws_config(prefix: str, all_roles: bool, dry_run: bool):
             f"default_role set:[/yellow] {', '.join(skipped)} (set default_role in orgs.yaml, "
             f"or pass --all-roles)"
         )
-    if not dry_run:
+    if conflicts:
+        console.print(
+            f"[red]Left {len(conflicts)} profile(s) untouched — a section with that name "
+            f"already exists and wasn't created by orgctl:[/red] {', '.join(sorted(conflicts))} "
+            f"(use --prefix to pick different profile names, or rename/remove the existing "
+            f"section yourself first)"
+        )
+    if not dry_run and written:
         console.print(f"[dim]Backup saved to {path}.bak[/dim]")
 
 

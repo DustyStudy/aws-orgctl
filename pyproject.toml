@@ -53,7 +53,7 @@ orgctl = "orgctl.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-orgctl = ["py.typed"]
+orgctl = ["py.typed", "examples/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
