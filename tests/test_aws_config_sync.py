@@ -83,9 +83,7 @@ def test_dry_run_writes_nothing(tmp_path):
 
 
 def test_skips_account_with_multiple_roles_and_no_default(tmp_path):
-    cfg = _cfg(
-        prod=Account(alias="prod", account_id="111111111111", roles=["read-only", "admin"])
-    )
+    cfg = _cfg(prod=Account(alias="prod", account_id="111111111111", roles=["read-only", "admin"]))
     written, skipped, conflicts, path = aws_config_sync.sync(cfg)
 
     assert written == []
