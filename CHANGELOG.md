@@ -10,6 +10,13 @@ workflow is active (see `.github/workflows/release-please.yml`) — it opens
 a PR that moves these into a versioned section on each release. Until the
 first tag exists, this file is maintained by hand.
 
+## [0.1.1](https://github.com/DustyStudy/aws-orgctl/compare/orgctl-v0.1.0...orgctl-v0.1.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* satisfy ruff format line-length on test_aws_config_sync.py ([#5](https://github.com/DustyStudy/aws-orgctl/issues/5)) ([89e0072](https://github.com/DustyStudy/aws-orgctl/commit/89e00720d3e8241cf90b231aebd578002e85bcb2))
+
 ## [Unreleased]
 
 ### Added
