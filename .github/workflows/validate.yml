@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -13,12 +17,22 @@ jobs:
   python:
     name: ruff + bandit (Python)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         if: ${{ hashFiles('**/*.py') != '' }}
         with:
           python-version: "3.12"
+
       - name: Install and run ruff + bandit
         if: ${{ hashFiles('**/*.py') != '' }}
         run: |
@@ -29,8 +43,17 @@ jobs:
   bash:
     name: shellcheck (Bash)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Run shellcheck on every .sh file
         if: ${{ hashFiles('**/*.sh') != '' }}
         run: |
@@ -40,8 +63,17 @@ jobs:
   powershell:
     name: PSScriptAnalyzer (PowerShell)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Run PSScriptAnalyzer on every .ps1 file
         if: ${{ hashFiles('**/*.ps1') != '' }}
         shell: pwsh
@@ -57,11 +89,24 @@ jobs:
   iac-sast:
     name: checkov (CFN + Terraform, if present)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # bridgecrewio/checkov-action: the underlying checkov CLI parses
+      # --framework as a space-separated list of choices, not a
+      # comma-separated string — "cloudformation,terraform" (one token)
+      # fails argparse's choices check. Space-separate instead.
       - uses: bridgecrewio/checkov-action@99bb2caf247dfd9f03cf984373bc6043d4e32ebf # v12.1347.0
         with:
           directory: .
-          framework: cloudformation,terraform
+          framework: cloudformation terraform
           quiet: true
           soft_fail: false
