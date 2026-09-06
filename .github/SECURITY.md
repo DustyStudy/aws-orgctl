@@ -67,13 +67,14 @@ default (immutable — a tag like `@v4` can be moved by the maintainer, or by
 an attacker who compromises the maintainer's account, without any signal to
 consumers). The exceptions are first-party GitHub actions
 (`actions/dependency-review-action`, `github/codeql-action`) and
-foundation/major-vendor actions with a strong release cadence and security
-track record (`googleapis/release-please-action`, `ossf/scorecard-action`),
-pinned to major-version tags instead — `github/codeql-action`'s own README
-explicitly recommends *against* SHA-pinning it, since some of its features
-are gated by server-side flags tied to the version tag rather than the
-code itself. Each such exception is called out with a comment in the
-workflow file where it's used.
+`googleapis/release-please-action`, pinned to major-version tags instead —
+`github/codeql-action`'s own README explicitly recommends *against*
+SHA-pinning it, since some of its features are gated by server-side flags
+tied to the version tag rather than the code itself. Each such exception is
+called out with a comment in the workflow file where it's used.
+`ossf/scorecard-action` is SHA-pinned like the default case — it doesn't
+actually publish a floating major-version tag, only full `vX.Y.Z` tags, so
+tag-pinning it isn't an option regardless of policy.
 
 Dependabot (`.github/dependabot.yml`) keeps both the SHA-pinned and
 tag-pinned actions current automatically.
