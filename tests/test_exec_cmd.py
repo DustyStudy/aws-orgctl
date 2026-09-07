@@ -1,0 +1,300 @@
+"""Tests for exec_cmd.run()'s guardrail branching: block / confirm / proceed.
+
+Credentials and the actual subprocess are faked throughout — these tests are
+about which branch `run()` takes and what it records to the audit log, not
+about SSO or process execution themselves (those are covered by test_sso.py
+equivalents / manual testing, same rationale as test_policy_check.py).
+"""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from orgctl import exec_cmd, guardrails
+from orgctl.config import Account, OrgConfig
+
+FAKE_CREDS = {
+    "AccessKeyId": "AKIAFAKE",
+    "SecretAccessKey": "fake-secret",
+    "SessionToken": "fake-token",
+    "Expiration": 9999999999000,
+}
+
+
+@pytest.fixture
+def cfg():
+    return OrgConfig(
+        name="test",
+        sso_start_url="https://example.awsapps.com/start",
+        sso_region="us-east-1",
+        default_region="us-east-1",
+        accounts={
+            "prod": Account(alias="prod", account_id="111111111111", roles=["admin"]),
+        },
+    )
+
+
+@pytest.fixture(autouse=True)
+def _home(tmp_path, monkeypatch):
+    # Route the audit log to a temp dir instead of the real ~/.orgctl.
+    monkeypatch.setenv("ORGCTL_HOME", str(tmp_path))
+    return tmp_path
+
+
+@pytest.fixture
+def fake_get_creds(monkeypatch):
+    calls = []
+
+    def _fake(sso_token, account_id, role_name):
+        calls.append((account_id, role_name))
+        return dict(FAKE_CREDS)
+
+    monkeypatch.setattr(exec_cmd, "get_role_credentials", _fake)
+    return calls
+
+
+@pytest.fixture
+def fake_subprocess(monkeypatch):
+    calls = []
+
+    class _FakeCompletedProcess:
+        returncode = 0
+
+    def _fake_run(command, env):
+        calls.append((command, env))
+        return _FakeCompletedProcess()
+
+    monkeypatch.setattr(exec_cmd.subprocess, "run", _fake_run)
+    return calls
+
+
+def _last_audit_entry(tmp_path) -> dict:
+    lines = (tmp_path / "audit.log").read_text().strip().splitlines()
+    return json.loads(lines[-1])
+
+
+def test_blocked_command_never_fetches_creds_or_runs(
+    cfg, fake_get_creds, fake_subprocess, tmp_path
+):
+    gcfg = guardrails.GuardrailConfig(deny_patterns=["aws s3 rb*"])
+    rc = exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "s3", "rb", "s3://important-bucket"],
+        gcfg=gcfg,
+    )
+
+    assert rc == 2
+    assert fake_get_creds == []  # never even tried to get credentials
+    assert fake_subprocess == []  # and definitely never ran the command
+
+    entry = _last_audit_entry(tmp_path)
+    assert entry["result"] == "blocked"
+    assert "deny pattern" in entry["detail"]
+
+
+def test_protected_account_id_blocks_regardless_of_command(cfg, fake_get_creds, fake_subprocess):
+    gcfg = guardrails.GuardrailConfig(protected_account_ids=["111111111111"])
+    rc = exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "s3", "ls"],  # innocuous command, but account is protected
+        gcfg=gcfg,
+    )
+
+    assert rc == 2
+    assert fake_get_creds == []
+
+
+def test_confirmation_declined_stops_before_running(
+    cfg, fake_get_creds, fake_subprocess, monkeypatch, tmp_path
+):
+    gcfg = guardrails.GuardrailConfig(
+        require_confirmation_patterns=["aws ec2 terminate-instances*"]
+    )
+    monkeypatch.setattr("builtins.input", lambda _: "n")
+
+    rc = exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "ec2", "terminate-instances", "--instance-ids", "i-123"],
+        gcfg=gcfg,
+    )
+
+    assert rc == 1
+    assert fake_get_creds == []
+    assert fake_subprocess == []
+    assert _last_audit_entry(tmp_path)["result"] == "cancelled"
+
+
+def test_confirmation_accepted_via_prompt_proceeds(
+    cfg, fake_get_creds, fake_subprocess, monkeypatch
+):
+    gcfg = guardrails.GuardrailConfig(
+        require_confirmation_patterns=["aws ec2 terminate-instances*"]
+    )
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+
+    rc = exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "ec2", "terminate-instances", "--instance-ids", "i-123"],
+        gcfg=gcfg,
+    )
+
+    assert rc == 0
+    assert fake_get_creds == [("111111111111", "admin")]
+    assert len(fake_subprocess) == 1
+
+
+def test_assume_yes_skips_prompt_entirely(cfg, fake_get_creds, fake_subprocess, monkeypatch):
+    gcfg = guardrails.GuardrailConfig(
+        require_confirmation_patterns=["aws ec2 terminate-instances*"]
+    )
+
+    def _fail_if_called(_):
+        raise AssertionError("input() should never be called when assume_yes=True")
+
+    monkeypatch.setattr("builtins.input", _fail_if_called)
+
+    rc = exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "ec2", "terminate-instances", "--instance-ids", "i-123"],
+        gcfg=gcfg,
+        assume_yes=True,
+    )
+
+    assert rc == 0
+    assert len(fake_subprocess) == 1
+
+
+def test_ordinary_command_runs_with_no_guardrail_config(cfg, fake_get_creds, fake_subprocess):
+    rc = exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "sts", "get-caller-identity"],
+        gcfg=guardrails.GuardrailConfig(),
+    )
+
+    assert rc == 0
+    assert fake_get_creds == [("111111111111", "admin")]
+    ((ran_command, env),) = fake_subprocess
+    assert ran_command == ["aws", "sts", "get-caller-identity"]
+
+
+def test_credentials_placed_in_child_env_and_profile_stripped(
+    cfg, fake_get_creds, fake_subprocess, monkeypatch
+):
+    monkeypatch.setenv("AWS_PROFILE", "some-other-profile")
+
+    exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "sts", "get-caller-identity"],
+        gcfg=guardrails.GuardrailConfig(),
+    )
+
+    ((_, env),) = fake_subprocess
+    assert env["AWS_ACCESS_KEY_ID"] == FAKE_CREDS["AccessKeyId"]
+    assert env["AWS_SECRET_ACCESS_KEY"] == FAKE_CREDS["SecretAccessKey"]
+    assert env["AWS_SESSION_TOKEN"] == FAKE_CREDS["SessionToken"]
+    assert env["AWS_DEFAULT_REGION"] == "us-east-1"
+    # A long-lived profile from the parent shell must never leak into a
+    # child process that's supposed to be running under short-lived SSO creds.
+    assert "AWS_PROFILE" not in env
+
+
+def test_exit_code_from_child_process_is_propagated(cfg, fake_get_creds, monkeypatch):
+    class _FailingCompletedProcess:
+        returncode = 137
+
+    monkeypatch.setattr(exec_cmd.subprocess, "run", lambda command, env: _FailingCompletedProcess())
+
+    rc = exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "sts", "get-caller-identity"],
+        gcfg=guardrails.GuardrailConfig(),
+    )
+
+    assert rc == 137
+
+
+def test_policy_precheck_warns_but_does_not_block_on_denial(
+    cfg, fake_get_creds, fake_subprocess, monkeypatch, capsys
+):
+    """check_action is advisory-only per the module's own docstring — a
+    predicted deny must print a warning but still let the real command run.
+    """
+    from orgctl import policy_check
+
+    monkeypatch.setattr(
+        policy_check,
+        "resolve_role_arn",
+        lambda creds, region: "arn:aws:iam::111111111111:role/admin",
+    )
+    monkeypatch.setattr(
+        policy_check,
+        "simulate",
+        lambda role_arn, action, resource: policy_check.PolicyCheckResult(
+            action=action, resource=resource, decision="explicitDeny", matched_statements=[]
+        ),
+    )
+
+    rc = exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "s3", "rm", "s3://bucket/key"],
+        gcfg=guardrails.GuardrailConfig(),
+        check_action="s3:DeleteObject",
+    )
+
+    assert rc == 0  # advisory only — proceeds regardless
+    assert len(fake_subprocess) == 1
+    assert "would be explicitDeny" in capsys.readouterr().err
+
+
+def test_policy_precheck_failure_warns_but_does_not_crash(
+    cfg, fake_get_creds, fake_subprocess, monkeypatch, capsys
+):
+    from orgctl import policy_check
+
+    def _boom(creds, region):
+        raise RuntimeError("no IAM permission to simulate")
+
+    monkeypatch.setattr(policy_check, "resolve_role_arn", _boom)
+
+    rc = exec_cmd.run(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        command=["aws", "s3", "ls"],
+        gcfg=guardrails.GuardrailConfig(),
+        check_action="s3:ListBucket",
+    )
+
+    assert rc == 0
+    assert len(fake_subprocess) == 1
+    assert "policy pre-check failed to run" in capsys.readouterr().err

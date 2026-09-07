@@ -67,6 +67,14 @@ def push_to_cloudwatch(log_group: str, region: str, n: int = 100) -> int:
     / logs:CreateLogStream on this log group). Returns the number of entries
     pushed. Requires boto3 — imported lazily so the rest of this module has
     no hard AWS dependency.
+
+    Note: this has no "since last push" cursor. Every call re-sends the last
+    `n` *local* entries regardless of whether they were already pushed on a
+    previous call — calling this repeatedly with overlapping local history
+    will produce duplicate CloudWatch log events (same message, different
+    ingestion time). This is intentional for a simple, stateless, ad-hoc
+    push — if you need exactly-once delivery, track your own high-water mark
+    externally, or push with a smaller `n` right after each command runs.
     """
     import boto3
 
