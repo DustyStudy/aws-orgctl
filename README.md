@@ -232,6 +232,10 @@ account IDs and role names. Two optional top-level fields:
 - `max_session_hours` (default 8) — force a fresh browser login after this
   many hours, independent of the SSO token's own server-side expiry.
 - `cloudwatch_log_group` — set this to enable `orgctl audit-log --push-cloudwatch`.
+  Each push resends the last `n` local entries with no "since last push"
+  tracking, so calling it repeatedly with overlapping history produces
+  duplicate CloudWatch events — push right after each command, or dedupe
+  downstream, if that matters for your use case.
 
 ### `~/.orgctl/guardrails.yaml` (optional)
 
@@ -251,6 +255,10 @@ recursive `s3 rm`, etc.).
 - `orgctl logout` clears every cached token/credential immediately.
 - Guardrails and the audit log are local-only conveniences, not a substitute
   for IAM permission boundaries, SCPs, or CloudTrail.
+
+See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the full breakdown —
+assets, trust boundaries, per-scenario mitigations and residual risk, and
+what's explicitly out of scope.
 
 ## Development
 

@@ -1,5 +1,10 @@
 # Security Policy
 
+For the full threat model — assets, trust boundaries, per-scenario
+mitigations, residual risk, and explicit non-goals — see
+[`docs/THREAT_MODEL.md`](../docs/THREAT_MODEL.md). This document covers
+vulnerability reporting and CI/CD supply-chain hardening specifically.
+
 ## Reporting a vulnerability
 
 If you find a security issue in `orgctl`, please open a private report via
