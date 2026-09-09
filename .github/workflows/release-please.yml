@@ -30,7 +30,7 @@ jobs:
       # major version tag rather than a SHA, consistent with how this repo
       # treats other first-party/foundation-maintained actions (see
       # SECURITY.md for the full pinning rationale).
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
