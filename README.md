@@ -5,13 +5,6 @@
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/DustyStudy/aws-orgctl/badge)](https://securityscorecards.dev/viewer/?uri=github.com/DustyStudy/aws-orgctl)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-> Badges only render publicly once this repo is public (or you're viewing
-> it while logged into GitHub) — private-repo badges need auth to display
-> for outside visitors. The Scorecard badge specifically only populates
-> after `scorecard.yml` has run at least once against the public repo. No
-> coverage badge yet; wiring one up needs a Codecov (or similar) account
-> and token, tracked as a follow-up.
-
 **Ephemeral AWS multi-account credential manager, built on IAM Identity Center (SSO).**
 
 No long-lived access keys. No static credentials sitting in `~/.aws/credentials`.
