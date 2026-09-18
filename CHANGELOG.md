@@ -10,6 +10,13 @@ workflow is active (see `.github/workflows/release-please.yml`) — it opens
 a PR that moves these into a versioned section on each release. Until the
 first tag exists, this file is maintained by hand.
 
+## [0.1.2](https://github.com/DustyStudy/aws-orgctl/compare/orgctl-v0.1.1...orgctl-v0.1.2) (2026-09-18)
+
+
+### Documentation
+
+* remove stale badge-visibility note from README ([#15](https://github.com/DustyStudy/aws-orgctl/issues/15)) ([2484952](https://github.com/DustyStudy/aws-orgctl/commit/248495219670da10f9e99df7d2f88e1b0f99a14e))
+
 ## [0.1.1](https://github.com/DustyStudy/aws-orgctl/compare/orgctl-v0.1.0...orgctl-v0.1.1) (2026-09-06)
 
 
