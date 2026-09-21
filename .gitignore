@@ -19,3 +19,12 @@ guardrails.yaml
 *.local.yaml
 
 .DS_Store
+.env
+.env.*
+*.tfvars
+!*.tfvars.example
+*.tfstate
+*.tfstate.*
+.terraform/
+*.pem
+*.key
