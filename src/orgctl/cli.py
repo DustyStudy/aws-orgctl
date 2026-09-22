@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import shutil
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 import click
 from rich.console import Console
@@ -12,6 +14,8 @@ from . import audit, aws_config_sync, cache, config, exec_cmd, sso
 from .config import ConfigError
 
 console = Console()
+
+T = TypeVar("T")
 
 
 def _load_config_or_exit() -> config.OrgConfig:
@@ -28,6 +32,57 @@ def _login_or_exit(cfg: config.OrgConfig) -> sso.SsoToken:
     except sso.SsoLoginError as e:
         console.print(f"[red]Login failed:[/red] {e}")
         sys.exit(1)
+
+
+def _guard(fn: Callable[..., T], *args: object, **kwargs: object) -> T:
+    """Call fn, turning an unknown account/role (ConfigError) or a rejected/
+    expired SSO token (SsoLoginError) into a clean one-line message and
+    exit(1), instead of the raw traceback these used to produce in every
+    command below `login`/`_load_config_or_exit`."""
+    try:
+        return fn(*args, **kwargs)
+    except (ConfigError, sso.SsoLoginError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
+
+
+def _resolve_and_get_creds(
+    cfg: config.OrgConfig, token: sso.SsoToken, account: str, role: str | None
+) -> tuple[config.Account, str, dict]:
+    acct = config.resolve_account(cfg, account)
+    resolved_role = config.resolve_role(acct, role)
+    creds = sso.get_role_credentials(token, acct.account_id, resolved_role)
+    return acct, resolved_role, creds
+
+
+def _fetch_remote_accounts(
+    token: sso.SsoToken,
+) -> tuple[list[str], list[str], list[list[str]]]:
+    accts = sso.list_accounts(token)
+    account_ids: list[str] = []
+    account_names: list[str] = []
+    roles_by_account: list[list[str]] = []
+    for a in accts:
+        account_ids.append(a["accountId"])
+        account_names.append(a["accountName"] or "-")
+        roles_by_account.append(sso.list_account_roles(token, a["accountId"]))
+    return account_ids, account_names, roles_by_account
+
+
+def _cache_dir_writable_error(cdir: Path) -> str | None:
+    """Actually exercise the cache directory with a real write+delete,
+    rather than assuming a successful cache_dir() (which only creates the
+    directory) means later writes will succeed too. Returns an error
+    message, or None if the probe write succeeded."""
+    import os
+
+    probe = cdir / f".orgctl_doctor_probe_{os.getpid()}"
+    try:
+        probe.write_text("ok")
+        probe.unlink()
+    except OSError as e:
+        return str(e)
+    return None
 
 
 @click.group()
@@ -131,7 +186,12 @@ def doctor():
         console.print(f"[red]FAIL[/red] config: {e}")
 
     cdir = cache.cache_dir()
-    console.print(f"[green]OK[/green] cache dir writable: {cdir}")
+    write_error = _cache_dir_writable_error(cdir)
+    if write_error:
+        problems.append(f"cache dir not writable: {write_error}")
+        console.print(f"[red]FAIL[/red] cache dir not writable: {cdir} ({write_error})")
+    else:
+        console.print(f"[green]OK[/green] cache dir writable: {cdir}")
 
     gcfg_path = Path.home() / ".orgctl" / "guardrails.yaml"
     if gcfg_path.exists():
@@ -197,15 +257,7 @@ def list_remote(as_json: bool):
     """List accounts/roles actually granted to you right now via Identity Center."""
     cfg = _load_config_or_exit()
     token = _login_or_exit(cfg)
-    accts = sso.list_accounts(token)
-
-    account_ids: list[str] = []
-    account_names: list[str] = []
-    roles_by_account: list[list[str]] = []
-    for a in accts:
-        account_ids.append(a["accountId"])
-        account_names.append(a["accountName"] or "-")
-        roles_by_account.append(sso.list_account_roles(token, a["accountId"]))
+    account_ids, account_names, roles_by_account = _guard(_fetch_remote_accounts, token)
 
     if as_json:
         import json
@@ -269,7 +321,8 @@ def exec_command(
     """
     cfg = _load_config_or_exit()
     token = _login_or_exit(cfg)
-    code = exec_cmd.run(
+    code = _guard(
+        exec_cmd.run,
         cfg,
         token,
         account,
@@ -297,7 +350,7 @@ def shell(account: str, role: str | None, region: str | None, reason: str | None
     """Spawn a subshell with credentials for --account/--role exported."""
     cfg = _load_config_or_exit()
     token = _login_or_exit(cfg)
-    code = exec_cmd.spawn_shell(cfg, token, account, role, region, reason=reason)
+    code = _guard(exec_cmd.spawn_shell, cfg, token, account, role, region, reason=reason)
     sys.exit(code)
 
 
@@ -328,8 +381,15 @@ def export_env(
     """
     cfg = _load_config_or_exit()
     token = _login_or_exit(cfg)
-    lines = exec_cmd.export_env_lines(
-        cfg, token, account, role, region, powershell=powershell, reason=reason
+    lines = _guard(
+        exec_cmd.export_env_lines,
+        cfg,
+        token,
+        account,
+        role,
+        region,
+        powershell=powershell,
+        reason=reason,
     )
     print(lines)
 
@@ -372,11 +432,11 @@ def creds_process(account: str, role: str | None):
         acct = config.resolve_account(cfg, account)
         resolved_role = config.resolve_role(acct, role)
         creds = sso.get_role_credentials(token, acct.account_id, resolved_role)
-    except ConfigError as e:
-        print(f"orgctl config error: {e}", file=sys.stderr)
+    except (ConfigError, sso.SsoLoginError) as e:
+        print(f"orgctl error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    exp = datetime.datetime.utcfromtimestamp(creds["Expiration"] / 1000.0).strftime(
+    exp = datetime.datetime.fromtimestamp(creds["Expiration"] / 1000.0, tz=datetime.UTC).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
     print(
@@ -399,9 +459,7 @@ def whoami(account: str, role: str | None):
     """Show the STS identity you'd get for --account/--role right now."""
     cfg = _load_config_or_exit()
     token = _login_or_exit(cfg)
-    acct = config.resolve_account(cfg, account)
-    resolved_role = config.resolve_role(acct, role)
-    creds = sso.get_role_credentials(token, acct.account_id, resolved_role)
+    acct, resolved_role, creds = _guard(_resolve_and_get_creds, cfg, token, account, role)
 
     import boto3
 
@@ -437,9 +495,7 @@ def check_policy(account: str, role: str | None, action: str, resource: str):
 
     cfg = _load_config_or_exit()
     token = _login_or_exit(cfg)
-    acct = config.resolve_account(cfg, account)
-    resolved_role = config.resolve_role(acct, role)
-    creds = sso.get_role_credentials(token, acct.account_id, resolved_role)
+    _acct, _resolved_role, creds = _guard(_resolve_and_get_creds, cfg, token, account, role)
 
     try:
         role_arn = policy_check.resolve_role_arn(creds, cfg.default_region)
