@@ -62,7 +62,8 @@ def login():
 @click.option(
     "--prefix",
     default="",
-    help="Profile name prefix/base (default: account alias itself)",
+    help="Prefix prepended to every profile name (<prefix>-<alias>[-<role>]); "
+    "default: none, so profiles are named after the account alias",
 )
 @click.option(
     "--all-roles",
@@ -77,13 +78,19 @@ def sync_aws_config(prefix: str, all_roles: bool, dry_run: bool):
     """Write credential_process profiles into ~/.aws/config for every account
     (and role, with --all-roles) in your registry.
 
-    Existing profiles you didn't create with this tool are left untouched.
-    A .bak backup of ~/.aws/config is made before any real write.
+    Existing profiles you didn't create with this tool, and any comments or
+    formatting in the file, are left untouched. If the file changes, the
+    previous version is first saved to a new timestamped ~/.aws/config.bak-*
+    file (earlier backups are never overwritten).
     """
     cfg = _load_config_or_exit()
-    written, skipped, conflicts, path = aws_config_sync.sync(
-        cfg, prefix=prefix, all_roles=all_roles, dry_run=dry_run
-    )
+    try:
+        written, skipped, conflicts, path, backup = aws_config_sync.sync(
+            cfg, prefix=prefix, all_roles=all_roles, dry_run=dry_run
+        )
+    except ConfigError as e:
+        console.print(f"[red]Config error:[/red] {e}")
+        sys.exit(1)
     verb = "Would write" if dry_run else "Wrote"
     console.print(
         f"[green]{verb} {len(written)} profile(s)[/green] to {path}: {', '.join(sorted(written))}"
@@ -101,8 +108,8 @@ def sync_aws_config(prefix: str, all_roles: bool, dry_run: bool):
             f"(use --prefix to pick different profile names, or rename/remove the existing "
             f"section yourself first)"
         )
-    if not dry_run and written:
-        console.print(f"[dim]Backup saved to {path}.bak[/dim]")
+    if backup:
+        console.print(f"[dim]Backup saved to {backup}[/dim]")
 
 
 @main.command()
