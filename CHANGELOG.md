@@ -10,6 +10,13 @@ workflow is active (see `.github/workflows/release-please.yml`) — it opens
 a PR that moves these into a versioned section on each release. Until the
 first tag exists, this file is maintained by hand.
 
+## [0.1.5](https://github.com/DustyStudy/aws-orgctl/compare/orgctl-v0.1.4...orgctl-v0.1.5) (2026-09-22)
+
+
+### Bug Fixes
+
+* cache file permission window, export-env quoting, shell guardrail gap ([#22](https://github.com/DustyStudy/aws-orgctl/issues/22)) ([ee94b9d](https://github.com/DustyStudy/aws-orgctl/commit/ee94b9d0e0a0b26d22fdd47bfda9ac36a8d36e08))
+
 ## [0.1.4](https://github.com/DustyStudy/aws-orgctl/compare/orgctl-v0.1.3...orgctl-v0.1.4) (2026-09-22)
 
 
