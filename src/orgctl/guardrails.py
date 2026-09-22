@@ -51,9 +51,8 @@ _BUILTIN_DENY = [
     "aws iam delete-account-alias*",
     "aws organizations leave-organization*",
     "aws organizations close-account*",
-    "* --recursive*s3*rm*",
+    "aws*s3 rm*--recursive*",
     "aws s3 rb*--force*",
-    "aws ec2 terminate-instances*--region * --instance-ids *all*",
 ]
 
 
