@@ -7,6 +7,7 @@ the cache, and never printed.
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -125,10 +126,29 @@ def spawn_shell(
     role: str | None,
     region: str | None = None,
     *,
+    gcfg: guardrails.GuardrailConfig | None = None,
     reason: str | None = None,
 ) -> int:
     account = resolve_account(cfg, account_alias_or_id)
     resolved_role = resolve_role(account, role)
+    gcfg = gcfg or guardrails.GuardrailConfig.load()
+
+    # There's no single "command" here to pattern-match against (this opens
+    # an interactive session), but the protected-account list is documented
+    # as covering both `exec` and `shell` — enforce that part of it.
+    block_reason = guardrails.check_protected_account(account.account_id, gcfg)
+    if block_reason:
+        audit.record(
+            action="shell",
+            account_id=account.account_id,
+            role=resolved_role,
+            result="blocked",
+            detail=block_reason,
+            reason=reason,
+        )
+        print(f"BLOCKED by guardrails: {block_reason}", file=sys.stderr)
+        return 2
+
     creds = get_role_credentials(sso_token, account.account_id, resolved_role)
     env = _creds_to_env(creds, region or cfg.default_region)
 
@@ -187,5 +207,15 @@ def export_env_lines(
         ("AWS_REGION", resolved_region),
     ]
     if powershell:
-        return "\n".join(f'$env:{k} = "{v}"' for k, v in pairs)
-    return "\n".join(f'export {k}="{v}"' for k, v in pairs)
+        return "\n".join(f"$env:{k} = {_powershell_quote(v)}" for k, v in pairs)
+    return "\n".join(f"export {k}={shlex.quote(v)}" for k, v in pairs)
+
+
+def _powershell_quote(value: str) -> str:
+    """Quote `value` for interpolation into a PowerShell double-quoted
+    string. AWS credentials/regions never actually contain these characters,
+    but the values still come from an external API response, so this is
+    defensive rather than provably unnecessary — same reasoning as using
+    shlex.quote() for the POSIX side above."""
+    escaped = value.replace("`", "``").replace('"', '`"').replace("$", "`$")
+    return f'"{escaped}"'

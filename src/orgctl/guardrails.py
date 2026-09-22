@@ -59,16 +59,30 @@ _BUILTIN_DENY = [
 ]
 
 
-def check_command(command: list[str], account_id: str, cfg: GuardrailConfig) -> str | None:
-    """Return a block reason string if the command should be denied, else None."""
-    joined = " ".join(command)
+def check_protected_account(account_id: str, cfg: GuardrailConfig) -> str | None:
+    """Return a block reason if account_id is marked protected, else None.
 
+    Split out from check_command() so callers with no single "command" to
+    pattern-match against — spawn_shell(), which opens an interactive
+    session rather than running one command — can still enforce the
+    protected-account list, which guardrails.yaml documents as covering
+    both `exec` and `shell`.
+    """
     if account_id in cfg.protected_account_ids:
         return (
             f"Account {account_id} is marked protected in guardrails.yaml — "
             f"remove it there if this command is intentional."
         )
+    return None
 
+
+def check_command(command: list[str], account_id: str, cfg: GuardrailConfig) -> str | None:
+    """Return a block reason string if the command should be denied, else None."""
+    protected_reason = check_protected_account(account_id, cfg)
+    if protected_reason:
+        return protected_reason
+
+    joined = " ".join(command)
     for pattern in _BUILTIN_DENY + cfg.deny_patterns:
         if fnmatch.fnmatch(joined, pattern):
             return f"Command matches deny pattern: '{pattern}'"

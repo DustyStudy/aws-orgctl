@@ -303,3 +303,44 @@ def test_policy_precheck_failure_warns_but_does_not_crash(
     assert rc == 0
     assert len(fake_subprocess) == 1
     assert "policy pre-check failed to run" in capsys.readouterr().err
+
+
+def test_spawn_shell_blocks_protected_account(
+    cfg, fake_get_creds, fake_subprocess, tmp_path, capsys
+):
+    # Regression: guardrails.yaml documents protected_account_ids as
+    # blocking "ANY command via `orgctl exec`/`shell`", but spawn_shell()
+    # never called into guardrails at all — there's no single "command" to
+    # pattern-match against for an interactive session, but the
+    # protected-account list should still apply.
+    gcfg = guardrails.GuardrailConfig(protected_account_ids=["111111111111"])
+
+    rc = exec_cmd.spawn_shell(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        gcfg=gcfg,
+    )
+
+    assert rc == 2
+    assert fake_get_creds == []
+    assert fake_subprocess == []
+    assert "BLOCKED by guardrails" in capsys.readouterr().err
+    assert _last_audit_entry(tmp_path)["result"] == "blocked"
+
+
+def test_spawn_shell_proceeds_when_account_not_protected(cfg, fake_get_creds, fake_subprocess):
+    gcfg = guardrails.GuardrailConfig(protected_account_ids=["999999999999"])
+
+    rc = exec_cmd.spawn_shell(
+        cfg,
+        sso_token=None,
+        account_alias_or_id="prod",
+        role="admin",
+        gcfg=gcfg,
+    )
+
+    assert rc == 0
+    assert fake_get_creds == [("111111111111", "admin")]
+    assert len(fake_subprocess) == 1

@@ -10,6 +10,18 @@ def test_protected_account_blocks_everything():
     assert "protected" in reason.lower()
 
 
+def test_check_protected_account_directly():
+    cfg = guardrails.GuardrailConfig(protected_account_ids=["111111111111"])
+    reason = guardrails.check_protected_account("111111111111", cfg)
+    assert reason is not None
+    assert "protected" in reason.lower()
+
+
+def test_check_protected_account_none_for_unprotected_account():
+    cfg = guardrails.GuardrailConfig(protected_account_ids=["111111111111"])
+    assert guardrails.check_protected_account("222222222222", cfg) is None
+
+
 def test_builtin_deny_blocks_leave_organization():
     cfg = guardrails.GuardrailConfig()
     reason = guardrails.check_command(
