@@ -13,6 +13,7 @@ Flow (standard AWS SSO OIDC device grant):
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import time
 import webbrowser
@@ -46,7 +47,10 @@ class SsoToken:
 
 
 def _token_cache_key(start_url: str, region: str) -> str:
-    return f"sso-token_{region}_{abs(hash(start_url))}"
+    # Must be stable across processes — the builtin hash() is randomized per
+    # interpreter run (PYTHONHASHSEED), which made every invocation miss the cache.
+    digest = hashlib.sha256(start_url.encode("utf-8")).hexdigest()[:16]
+    return f"sso-token_{region}_{digest}"
 
 
 def login(
