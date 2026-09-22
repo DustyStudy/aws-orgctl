@@ -76,3 +76,21 @@ def test_builtin_deny_blocks_documented_destructive_commands(command):
 def test_builtin_deny_does_not_block_benign_s3_commands(command):
     reason = guardrails.check_command(command, "222222222222", guardrails.GuardrailConfig())
     assert reason is None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["aws", "--profile", "prod", "organizations", "leave-organization"],
+        ["aws", "--region", "us-east-1", "organizations", "close-account", "--account-id", "1"],
+        ["aws", "--profile", "prod", "iam", "delete-account-alias", "--account-alias", "x"],
+        ["aws", "--profile", "prod", "s3", "rb", "s3://bucket", "--force"],
+    ],
+)
+def test_builtin_deny_blocks_destructive_commands_with_global_flags_before_service(command):
+    # Regression: every built-in pattern except the recursive-s3-rm one still
+    # required "aws" to be immediately followed by the service name, so a
+    # global flag in between (as real `aws` CLI usage often has) slipped past.
+    reason = guardrails.check_command(command, "222222222222", guardrails.GuardrailConfig())
+    assert reason is not None
+    assert "deny pattern" in reason
