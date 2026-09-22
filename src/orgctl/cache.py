@@ -66,6 +66,23 @@ def _lock_down(path: Path) -> None:
         pass  # e.g. Windows — best effort only
 
 
+def _write_locked_down(path: Path, data: str) -> None:
+    """Create/overwrite `path` with owner-only permissions in place, rather
+    than writing with the default (often world-readable) mode and chmod'ing
+    afterward — which leaves a brief window where a brand-new cache file,
+    containing a live token or credentials, is readable by anyone. Still
+    best-effort on Windows, where os.open()'s mode argument doesn't map onto
+    real ACLs (see _lock_down above) — the final _lock_down call here mainly
+    matters for the case the file already existed with looser permissions.
+    """
+    fd = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(data)
+    finally:
+        _lock_down(path)
+
+
 def _path_for(key: str) -> Path:
     safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in key)
     return cache_dir() / f"{safe}.json"
@@ -159,8 +176,7 @@ def put(key: str, value: dict) -> None:
                 pass  # fall back to file cache below
 
     p = _path_for(key)
-    p.write_text(json.dumps(value))
-    _lock_down(p)
+    _write_locked_down(p, json.dumps(value))
 
 
 def _keyring_delete(key: str) -> None:
