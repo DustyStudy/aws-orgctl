@@ -160,11 +160,20 @@ configure`, from another tool) results in silent data loss or, worse, a
 **Mitigation:** fixed as of the per-section managed-marker change (see
 `aws_config_sync.py`) — a name collision with a section that doesn't carry
 orgctl's own marker is left completely untouched and reported back as a
-conflict, never silently mutated. A `.bak` copy is made before any real
-write regardless.
+conflict, never silently mutated. The file is edited as text rather than
+parsed and re-serialized, so comments and formatting in everything orgctl
+didn't write survive byte-for-byte. Before changing an existing file, the
+previous version is copied to a new timestamped `config.bak-<stamp>`;
+backups are never overwritten, so the original survives repeated runs. A
+run that would change nothing writes nothing and makes no backup. Two
+registry entries that map to the same profile name are rejected outright.
 
-**Residual risk:** none identified beyond the general "back up your own
-dotfiles" hygiene that applies to any tool that writes to
+**Residual risk:** orgctl-managed sections are overwritten wholesale on
+re-run, so hand edits made *inside* a section orgctl wrote are lost (the
+timestamped backup is the recovery path). Orgctl never deletes sections it
+wrote earlier, so profiles from a previous `--prefix`/`--all-roles`
+choice linger until removed by hand. Beyond that, the general "back up
+your own dotfiles" hygiene applies to any tool that writes to
 `~/.aws/config`.
 
 ### 6. Audit log data pushed to CloudWatch is read or tampered with

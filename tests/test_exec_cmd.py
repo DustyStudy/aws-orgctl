@@ -252,13 +252,15 @@ def test_policy_precheck_warns_but_does_not_block_on_denial(
         "resolve_role_arn",
         lambda creds, region: "arn:aws:iam::111111111111:role/admin",
     )
-    monkeypatch.setattr(
-        policy_check,
-        "simulate",
-        lambda role_arn, action, resource: policy_check.PolicyCheckResult(
+    seen = {}
+
+    def _simulate(creds, role_arn, action, resource, region):
+        seen.update(creds=creds, region=region)
+        return policy_check.PolicyCheckResult(
             action=action, resource=resource, decision="explicitDeny", matched_statements=[]
-        ),
-    )
+        )
+
+    monkeypatch.setattr(policy_check, "simulate", _simulate)
 
     rc = exec_cmd.run(
         cfg,
@@ -273,6 +275,9 @@ def test_policy_precheck_warns_but_does_not_block_on_denial(
     assert rc == 0  # advisory only — proceeds regardless
     assert len(fake_subprocess) == 1
     assert "would be explicitDeny" in capsys.readouterr().err
+    # The simulator must be called with the role's credentials, not ambient ones.
+    assert seen["creds"] == FAKE_CREDS
+    assert seen["region"] == "us-east-1"
 
 
 def test_policy_precheck_failure_warns_but_does_not_crash(

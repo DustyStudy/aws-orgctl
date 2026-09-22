@@ -60,8 +60,8 @@ CLI (`exec`, `shell`) for using them.
 - **Typed** — ships a `py.typed` marker; mypy-checked in CI.
 - **`orgctl sync-aws-config`** — writes a `credential_process` profile into
   `~/.aws/config` for every account (or every account/role with
-  `--all-roles`) in your registry. Backs up the existing file first and
-  never touches profiles it didn't create.
+  `--all-roles`) in your registry. Backs up the existing file before
+  changing it and never touches profiles (or comments) it didn't create.
 - **OS keychain for SSO tokens** — with the `keyring` extra installed and a
   working backend (macOS Keychain, Windows Credential Manager, Secret
   Service/KWallet), the SSO token itself is stored there instead of a plain
@@ -211,8 +211,16 @@ later run can tell "orgctl created this" apart from "this profile name
 already existed." If a profile name from your registry collides with a
 section you already had (from `aws configure`, hand-editing, etc.), that
 section is left completely alone and reported back as a conflict — nothing
-about it is overwritten. A `.bak` copy of `~/.aws/config` is made before
-any real write. Re-run it any time your `orgs.yaml` changes.
+about it is overwritten. The file is edited in place as text, so comments,
+formatting, and every other profile are preserved exactly as you wrote them.
+If a run changes the file, the previous version is first saved as a new
+timestamped `~/.aws/config.bak-<stamp>` (earlier backups are never
+overwritten); a re-run that changes nothing writes nothing. `--prefix corp`
+names profiles `corp-<alias>` (`corp-<alias>-<role>` with `--all-roles`), and
+two registry entries that would map to the same profile name are rejected
+rather than one silently winning. Orgctl doesn't delete profiles it wrote
+earlier, so if you change `--prefix`/`--all-roles`, remove the old
+orgctl-managed sections yourself. Re-run it any time your `orgs.yaml` changes.
 
 ## Configuration
 
