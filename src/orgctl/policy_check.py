@@ -69,12 +69,12 @@ def resolve_role_arn(creds: dict, region: str) -> str:
 
     raise RuntimeError(
         f"Could not resolve IAM role ARN for '{role_name}' via iam:ListRoles "
-        f"(the role may lack that permission). Pass --role-arn explicitly to "
-        f"`orgctl check-policy` instead."
+        f"(the role may lack that permission)."
     )
 
 
 def simulate(
+    creds: dict,
     role_arn: str,
     action: str,
     resource: str = "*",
@@ -83,8 +83,18 @@ def simulate(
     """Ask IAM's policy simulator whether `role_arn` can perform `action` on
     `resource`, based on its identity-based policies only (see module
     docstring for the SCP/resource-policy caveat).
+
+    The simulator call is made with `creds` (the short-lived credentials for
+    the role's account) — never with whatever ambient credentials happen to
+    be in the environment, which may belong to a different account entirely.
     """
-    client = boto3.client("iam", region_name=region)
+    session = boto3.Session(
+        aws_access_key_id=creds["AccessKeyId"],
+        aws_secret_access_key=creds["SecretAccessKey"],
+        aws_session_token=creds["SessionToken"],
+        region_name=region,
+    )
+    client = session.client("iam")
     if resource == "*":
         resp = client.simulate_principal_policy(PolicySourceArn=role_arn, ActionNames=[action])
     else:

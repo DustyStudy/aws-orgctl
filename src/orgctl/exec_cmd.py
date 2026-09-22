@@ -86,8 +86,11 @@ def run(
         from . import policy_check
 
         try:
-            role_arn = policy_check.resolve_role_arn(creds, region or cfg.default_region)
-            result = policy_check.simulate(role_arn, check_action, check_resource)
+            check_region = region or cfg.default_region
+            role_arn = policy_check.resolve_role_arn(creds, check_region)
+            result = policy_check.simulate(
+                creds, role_arn, check_action, check_resource, check_region
+            )
         except Exception as e:  # noqa: BLE001 — surface any failure as a warning, don't crash the real command
             print(f"WARNING: policy pre-check failed to run: {e}", file=sys.stderr)
         else:

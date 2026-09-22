@@ -436,7 +436,7 @@ def check_policy(account: str, role: str | None, action: str, resource: str):
 
     try:
         role_arn = policy_check.resolve_role_arn(creds, cfg.default_region)
-        result = policy_check.simulate(role_arn, action, resource)
+        result = policy_check.simulate(creds, role_arn, action, resource, cfg.default_region)
     except Exception as e:  # noqa: BLE001
         console.print(f"[red]Check failed:[/red] {e}")
         sys.exit(1)
