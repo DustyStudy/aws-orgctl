@@ -1,4 +1,9 @@
+import os
+import stat
+import sys
 import time
+
+import pytest
 
 from orgctl import cache
 
@@ -57,3 +62,36 @@ def test_sso_token_key_respects_expiry(tmp_path, monkeypatch):
     monkeypatch.setenv("ORGCTL_HOME", str(tmp_path))
     cache.put("sso-token_expired", {"accessToken": "x", "expiresAt": time.time() - 10})
     assert cache.get("sso-token_expired") is None
+
+
+def test_put_creates_new_files_with_owner_only_mode_atomically(tmp_path, monkeypatch):
+    # Regression: the old implementation wrote with Path.write_text() (mode
+    # dictated by the process umask, often world-readable) and only
+    # restricted access with chmod() afterward — a real window during which
+    # a brand-new token/credentials file was readable by anyone. os.open()
+    # with O_CREAT and an explicit mode sets the permissions atomically at
+    # creation time instead.
+    monkeypatch.setenv("ORGCTL_HOME", str(tmp_path))
+    calls = []
+    real_open = os.open
+
+    def _spy_open(path, flags, mode=0o777):
+        calls.append((flags, mode))
+        return real_open(path, flags, mode)
+
+    monkeypatch.setattr(cache.os, "open", _spy_open)
+    cache.put("mykey", {"value": 1, "expiresAt": time.time() + 60})
+
+    assert calls, "expected cache.put() to create the file via os.open()"
+    flags, mode = calls[-1]
+    assert flags & os.O_CREAT
+    assert flags & os.O_WRONLY
+    assert mode == 0o600
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits don't apply on Windows")
+def test_put_file_has_owner_only_permissions_on_disk(tmp_path, monkeypatch):
+    monkeypatch.setenv("ORGCTL_HOME", str(tmp_path))
+    cache.put("mykey", {"value": 1, "expiresAt": time.time() + 60})
+    path = cache.cache_dir() / "mykey.json"
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

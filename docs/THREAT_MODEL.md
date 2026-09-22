@@ -22,7 +22,7 @@ What this tool has custody of, at some point, and what protecting it means:
 | Asset | Where it lives | What "protected" means |
 |---|---|---|
 | SSO access token | OS keychain (preferred) or `~/.orgctl/` cache file (fallback) | Not written to disk in plaintext when a keychain is available; 0600 permissions and expiry-checked reads when it isn't |
-| Short-lived role credentials (`AccessKeyId`/`SecretAccessKey`/`SessionToken`) | Same cache, keyed per account+role | Same as above, plus never exported outside the one child process/shell that requested them |
+| Short-lived role credentials (`AccessKeyId`/`SecretAccessKey`/`SessionToken`) | Same cache, keyed per account+role | Same as above, plus never exported outside the one child process/shell that requested them — except via `export-env`/`creds-process`, whose whole purpose is printing them to stdout for the caller's own use (see scenario 4) |
 | `orgs.yaml` (account registry) | `~/.orgctl/orgs.yaml` (or `ORGCTL_CONFIG`) | Contains account IDs and role names only — no secrets — but is still the map an attacker would want to see, and its contents drive which guardrails apply |
 | `guardrails.yaml` | `~/.orgctl/guardrails.yaml` (or `ORGCTL_GUARDRAILS`) | Governs which commands get blocked/confirmed — its integrity matters more than its confidentiality |
 | Local audit log | `~/.orgctl/audit.log` (or `ORGCTL_HOME`) | A record of what was run against which account, for the operator's own review; append-only in practice, not append-only *enforced* (see below) |
@@ -131,15 +131,27 @@ channel, not an ad-hoc copy.
 shell history, a subprocess the operator didn't intend to grant them to,
 or the parent shell's own environment.
 
-**Mitigation:** `exec_cmd._creds_to_env()` builds a **copy** of the
-environment (`os.environ.copy()`), so the parent shell's own `os.environ`
-is never mutated — credentials exist only in the memory of the one
-`subprocess.run()` child. `AWS_PROFILE` is explicitly stripped from that
-copy so a long-lived profile configured in the parent shell can't get
+**Mitigation:** for `exec`/`shell`, `exec_cmd._creds_to_env()` builds a
+**copy** of the environment (`os.environ.copy()`), so the parent shell's
+own `os.environ` is never mutated — credentials exist only in the memory of
+the one `subprocess.run()` child. `AWS_PROFILE` is explicitly stripped from
+that copy so a long-lived profile configured in the parent shell can't get
 picked up by mistake alongside the short-lived creds. `subprocess.run()` is
 called with a list (`command`), never `shell=True` with a joined string —
 so there's no shell-injection surface from account aliases, role names, or
 arguments containing shell metacharacters.
+
+`export-env` and `creds-process` are a deliberate exception to "stays in
+one child process" — printing credentials to stdout is their entire
+purpose (`eval`-ing into the *current* shell, or feeding AWS tooling's
+`credential_process` protocol), not a leak. What they still guard against:
+`export_env_lines()` quotes every value before interpolating it into the
+printed `export KEY=value` / `$env:KEY = "value"` line (`shlex.quote()` on
+POSIX, backtick/`"`/`$` escaping on PowerShell), so a value containing a
+shell metacharacter can't break out of its assignment when the caller
+`eval`s the output; `creds-process` writes human-readable errors and the
+login URL to stderr only, keeping stdout clean JSON for the AWS SDK/CLI to
+parse.
 
 **Residual risk:** once credentials are in a child process's environment,
 `orgctl` has no control over what that child process (or anything *it*

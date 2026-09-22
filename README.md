@@ -250,9 +250,12 @@ recursive `s3 rm`, etc.).
 
 - Credentials are always short-lived (from AWS SSO's `GetRoleCredentials`),
   scoped to exactly the account/role requested, and expire on their own.
-- Nothing is ever written to a shell's exported `AWS_*` variables outside the
-  child process spawned by `exec`/`shell` — your parent shell's environment
-  is untouched.
+- `exec` and `shell` never touch the parent shell's own environment —
+  credentials exist only in the memory of the one child process/subshell
+  spawned for that command. `export-env` and `creds-process` are the
+  deliberate exceptions: printing credentials to stdout (for `eval` into
+  your *current* shell, or for AWS tooling's `credential_process` protocol)
+  is their whole point, not a leak — see the notes on them above.
 - `orgctl logout` clears every cached token/credential immediately.
 - Guardrails and the audit log are local-only conveniences, not a substitute
   for IAM permission boundaries, SCPs, or CloudTrail.
