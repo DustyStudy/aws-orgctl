@@ -10,6 +10,13 @@ workflow is active (see `.github/workflows/release-please.yml`) — it opens
 a PR that moves these into a versioned section on each release. Until the
 first tag exists, this file is maintained by hand.
 
+## [0.1.4](https://github.com/DustyStudy/aws-orgctl/compare/orgctl-v0.1.3...orgctl-v0.1.4) (2026-09-22)
+
+
+### Bug Fixes
+
+* clean errors for expired tokens/bad accounts, guardrail bypass, audit timestamps ([#20](https://github.com/DustyStudy/aws-orgctl/issues/20)) ([ed28272](https://github.com/DustyStudy/aws-orgctl/commit/ed28272300f657215e8de3b550ba40a4f700398a))
+
 ## [0.1.3](https://github.com/DustyStudy/aws-orgctl/compare/orgctl-v0.1.2...orgctl-v0.1.3) (2026-09-22)
 
 
