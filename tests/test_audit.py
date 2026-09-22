@@ -33,3 +33,15 @@ def test_tail_respects_n(tmp_path, monkeypatch):
     entries = audit.tail(2)
     assert len(entries) == 2
     assert entries[-1]["account_id"] == "4"
+
+
+def test_entry_timestamp_ms_parses_the_entrys_own_ts():
+    assert audit._entry_timestamp_ms({"ts": "2020-01-01T00:00:00Z"}, fallback_ms=0) == 1577836800000
+
+
+def test_entry_timestamp_ms_falls_back_when_ts_missing():
+    assert audit._entry_timestamp_ms({}, fallback_ms=123) == 123
+
+
+def test_entry_timestamp_ms_falls_back_when_ts_unparseable():
+    assert audit._entry_timestamp_ms({"ts": "not a timestamp"}, fallback_ms=456) == 456

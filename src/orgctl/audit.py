@@ -7,6 +7,7 @@ prod last Tuesday") — it is never uploaded anywhere by this tool.
 
 from __future__ import annotations
 
+import calendar
 import getpass
 import json
 import os
@@ -14,6 +15,8 @@ import socket
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+_TS_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def log_path() -> Path:
@@ -43,7 +46,7 @@ def record(
     against a role ARN instead of SSO's GetRoleCredentials.
     """
     entry = {
-        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "ts": time.strftime(_TS_FORMAT, time.gmtime()),
         "user": getpass.getuser(),
         "host": socket.gethostname(),
         "action": action,
@@ -71,10 +74,11 @@ def push_to_cloudwatch(log_group: str, region: str, n: int = 100) -> int:
     Note: this has no "since last push" cursor. Every call re-sends the last
     `n` *local* entries regardless of whether they were already pushed on a
     previous call — calling this repeatedly with overlapping local history
-    will produce duplicate CloudWatch log events (same message, different
-    ingestion time). This is intentional for a simple, stateless, ad-hoc
-    push — if you need exactly-once delivery, track your own high-water mark
-    externally, or push with a smaller `n` right after each command runs.
+    will produce duplicate CloudWatch log events (same message, same event
+    timestamp, different ingestion time). This is intentional for a simple,
+    stateless, ad-hoc push — if you need exactly-once delivery, track your
+    own high-water mark externally, or push with a smaller `n` right after
+    each command runs.
     """
     import boto3
 
@@ -93,8 +97,9 @@ def push_to_cloudwatch(log_group: str, region: str, n: int = 100) -> int:
     except client.exceptions.ResourceAlreadyExistsException:
         pass
 
+    now_ms = int(time.time() * 1000)
     log_events: list[InputLogEventTypeDef] = [
-        {"timestamp": int(time.time() * 1000), "message": json.dumps(e)} for e in entries
+        {"timestamp": _entry_timestamp_ms(e, now_ms), "message": json.dumps(e)} for e in entries
     ]
     log_events.sort(key=lambda ev: ev["timestamp"])
 
@@ -104,6 +109,19 @@ def push_to_cloudwatch(log_group: str, region: str, n: int = 100) -> int:
         logEvents=log_events,
     )
     return len(log_events)
+
+
+def _entry_timestamp_ms(entry: dict, fallback_ms: int) -> int:
+    """The entry's own recorded time, as epoch milliseconds — not the time
+    it happens to be pushed. Falls back to `fallback_ms` (the push time) for
+    an entry with no/unparseable `ts`, e.g. hand-edited log lines."""
+    ts = entry.get("ts")
+    if not ts:
+        return fallback_ms
+    try:
+        return calendar.timegm(time.strptime(ts, _TS_FORMAT)) * 1000
+    except ValueError:
+        return fallback_ms
 
 
 def tail(n: int = 20) -> list[dict]:

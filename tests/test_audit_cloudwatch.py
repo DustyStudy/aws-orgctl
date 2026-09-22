@@ -9,7 +9,9 @@ logs:CreateLogGroup. These tests reflect that expectation.
 
 from __future__ import annotations
 
+import calendar
 import json
+import time
 
 import boto3
 import pytest
@@ -112,6 +114,54 @@ def test_repeated_push_reuses_stream_but_resends_overlapping_entries(logs_client
     account_ids = [json.loads(e["message"])["account_id"] for e in events]
     assert account_ids.count("111") == 2  # resent — expected, see docstring
     assert account_ids.count("222") == 1
+
+
+def test_push_uses_each_entrys_own_timestamp_not_push_time(logs_client):
+    # Regression: every event was stamped with time.time() at push time, so
+    # CloudWatch showed all events bunched at push time instead of when they
+    # actually happened, defeating the point of an audit trail.
+    #
+    # An hour ago, not further back: CloudWatch rejects/drops PutLogEvents
+    # older than 14 days, so this stays well within that window while still
+    # being clearly distinct from "now" (push time).
+    an_hour_ago = time.gmtime(time.time() - 3600)
+    old_ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", an_hour_ago)
+    expected_ms = int(calendar.timegm(an_hour_ago)) * 1000
+    entry = {
+        "ts": old_ts,
+        "user": "u",
+        "host": "h",
+        "action": "exec",
+        "account_id": "111111111111",
+        "role": "r",
+        "command": [],
+        "result": "ok",
+        "detail": None,
+        "reason": None,
+    }
+    with audit.log_path().open("a") as f:
+        f.write(json.dumps(entry) + "\n")
+
+    n = audit.push_to_cloudwatch(LOG_GROUP, REGION)
+    assert n == 1
+
+    events = _get_events(logs_client)
+    assert len(events) == 1
+    assert events[0]["timestamp"] == expected_ms
+
+
+def test_push_falls_back_to_push_time_for_entry_with_no_ts(logs_client):
+    entry = {"user": "u", "host": "h", "action": "exec", "account_id": "111111111111", "role": "r"}
+    with audit.log_path().open("a") as f:
+        f.write(json.dumps(entry) + "\n")
+
+    before_ms = int(time.time() * 1000)
+    n = audit.push_to_cloudwatch(LOG_GROUP, REGION)
+    after_ms = int(time.time() * 1000)
+    assert n == 1
+
+    events = _get_events(logs_client)
+    assert before_ms <= events[0]["timestamp"] <= after_ms
 
 
 def test_push_fails_loudly_if_log_group_does_not_exist():

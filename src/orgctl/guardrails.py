@@ -46,13 +46,16 @@ class GuardrailConfig:
 
 
 # Sensible built-in defaults on top of whatever the user configures —
-# these catch the classic "wrong terminal tab" disasters.
+# these catch the classic "wrong terminal tab" disasters. Each pattern uses
+# "aws*<service> <verb>" rather than "aws <service> <verb>" so a global flag
+# between "aws" and the service (e.g. "aws --profile x s3 rb ... --force")
+# still matches instead of slipping through the gap.
 _BUILTIN_DENY = [
-    "aws iam delete-account-alias*",
-    "aws organizations leave-organization*",
-    "aws organizations close-account*",
+    "aws*iam delete-account-alias*",
+    "aws*organizations leave-organization*",
+    "aws*organizations close-account*",
     "aws*s3 rm*--recursive*",
-    "aws s3 rb*--force*",
+    "aws*s3 rb*--force*",
 ]
 
 
