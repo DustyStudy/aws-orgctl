@@ -264,6 +264,13 @@ See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for the full breakdown —
 assets, trust boundaries, per-scenario mitigations and residual risk, and
 what's explicitly out of scope.
 
+## Proof
+
+Run for real against a real IAM Identity Center instance — login, both
+guardrail types, audit logging, `sync-aws-config`, and `logout` all
+verified against AWS's own responses. Unlike this tool's earlier fix
+rounds, this pass found nothing broken. See [`docs/PROOF.md`](docs/PROOF.md).
+
 ## Development
 
 ```bash

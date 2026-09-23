@@ -1,0 +1,17 @@
+{
+  "note": "Each claim checked against AWS's own response (via a separate `aws sts get-caller-identity` or direct API read), not just orgctl's own reported success. Account IDs masked.",
+  "login": "Device-authorization flow completed against the real IAM Identity Center start URL; token cached under ~/.orgctl/cache.",
+  "whoami": {
+    "dev": "arn:aws:sts::<dev-account>:assumed-role/AWSReservedSSO_AdministratorAccess_.../darrington",
+    "management": "arn:aws:sts::<management-account>:assumed-role/AWSReservedSSO_AdministratorAccess_.../darrington"
+  },
+  "list_remote": "Returned all 3 accounts actually granted via Identity Center, including one (cfb-picks) that was never added to the local orgs.yaml registry - confirms it queries live SSO grants, not just the local config file.",
+  "check_policy": {
+    "s3:GetObject": "allowed (AdministratorAccess matches)",
+    "organizations:LeaveOrganization": "allowed (AdministratorAccess's identity-based policy technically permits it)",
+    "note": "The second result demonstrates the tool's own documented caveat live: identity-based policies only, SCPs not evaluated. AdministratorAccess's Action:* does technically allow this at the identity-policy layer; whether Organizations/an SCP would actually permit it was correctly out of scope and not claimed otherwise."
+  },
+  "export_env_and_creds_process": "shlex.quote()-based quoting confirmed in source (exec_cmd.py); output values in this run didn't need visible quotes since they only contained shlex-safe characters (base64-alphabet + '/+='). credential_process JSON output validated directly against `aws sts get-caller-identity --profile dev/management` after `sync-aws-config` wrote both profiles.",
+  "sync_aws_config": "Wrote 2 new [profile] blocks (dev, management) into ~/.aws/config, left the 3 pre-existing [profile]/[sso-session] blocks it didn't create completely untouched, and made its own timestamped backup before writing - matching the README's documented behavior exactly.",
+  "logout": "Cleared 3 cached entries; cache directory confirmed empty afterward. The next `whoami` call transparently re-triggered the device-authorization flow (no stale-credential fallback) and succeeded once approved."
+}
