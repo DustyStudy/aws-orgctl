@@ -10,6 +10,13 @@ workflow is active (see `.github/workflows/release-please.yml`) — it opens
 a PR that moves these into a versioned section on each release. Until the
 first tag exists, this file is maintained by hand.
 
+## [0.1.6](https://github.com/DustyStudy/aws-orgctl/compare/orgctl-v0.1.5...orgctl-v0.1.6) (2026-09-23)
+
+
+### Documentation
+
+* **proof:** orgctl tested against a real IAM Identity Center org ([#24](https://github.com/DustyStudy/aws-orgctl/issues/24)) ([44224b5](https://github.com/DustyStudy/aws-orgctl/commit/44224b5edd7ce488660737a31cb05f13bfefe107))
+
 ## [0.1.5](https://github.com/DustyStudy/aws-orgctl/compare/orgctl-v0.1.4...orgctl-v0.1.5) (2026-09-22)
 
 
